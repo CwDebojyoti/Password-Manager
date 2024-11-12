@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.orm import sessionmaker
-
+import os
 
 
 # ---------------------------- UI SETUP ------------------------------- #
@@ -47,16 +47,37 @@ password_input = tkinter.Entry(width= 33)
 password_input.grid(column=1, row=3)
 
 
+# ---------------------------- PASSWORD ENCRIPTION ------------------------------- #
+
+# To check if the key is present as environment variable, if not it will generate a key:
+def get_or_generate_key():
+    key = os.environ.get("ENCRYPT_KEY")
+    if key is None:
+        key = Fernet.generate_key()
+        os.environ["ENCRYPT_KEY"] = key.decode()
+    return key
+
+# Use the generated key
+key = os.environ.get("ENCRYP_KEY")  # Replace with your actual key
+cipher_suite = Fernet(key.encode())
+
+def encrypt_password(password):
+    encrypted_password = cipher_suite.encrypt(password.encode())
+    return encrypted_password
+
+def decrypt_password(encrypted_password):
+    decrypted_password = cipher_suite.decrypt(encrypted_password).decode()
+    return decrypted_password
+
+
 
 # ---------------------------- DataBase SETUP ------------------------------- #
 
 # Create an engine
 engine = create_engine('sqlite:///password_manager.db', echo=True)
 
-
 # Create a base class for declarative class definitions
 Base = declarative_base()
-
 
 class PasswordManager(Base):
     __tablename__ = 'password'
@@ -74,7 +95,19 @@ Session = sessionmaker(bind=engine)
 session = Session()
 
 
-# ---------------------------- PASSWORD ENCRIPTION ------------------------------- #
+# Creating inbuit record for admin password:
+record_count = session.query(PasswordManager).count()
+
+if record_count == 0:
+    input_email = simpledialog.askstring("Input", "Please enter Email:")
+    input_pw = simpledialog.askstring("Input", "Please enter Admin Password:")
+    default_admin_password = PasswordManager(
+        email= input_email,
+        platform="administrator",
+        user_password= encrypt_password(input_pw) )
+
+    session.add(default_admin_password)
+    session.commit()
 
 
 
@@ -85,6 +118,8 @@ def save_pw():
     website = website_input.get()
     username = username_input.get()
     password = password_input.get()
+
+    encrypted_password = encrypt_password(password)
 
     result = session.execute(session.query(PasswordManager).order_by(PasswordManager.id))
     all_result = result.scalars().all()
@@ -102,7 +137,7 @@ def save_pw():
         is_ok = messagebox.askokcancel(title= "Save", message= f"You have entered below details: \nWebsite: {website} \nEmail: {username}, \nPassword: {password} \nDo you want to save?")
 
         if is_ok:
-            new_data = PasswordManager(email = f"{username}", platform = f"{website}", user_password = f"{password}")
+            new_data = PasswordManager(email = username, platform = website, user_password = encrypted_password)
             session.add(new_data)
             session.commit()
             messagebox.showinfo(title= "Saved", message= "Credential saved Successfully!")
@@ -115,7 +150,7 @@ def save_pw():
 def auth():
     user_input = simpledialog.askstring("Input", "Please enter admin password:")
     admin_account = session.query(PasswordManager).filter_by(platform='administrator').first()
-    if user_input == admin_account.user_password:
+    if user_input == decrypt_password(admin_account.user_password):
         return True
     else:
         messagebox.showinfo(title= "Update Failed!", message= "Incorrect Password!")
@@ -133,10 +168,11 @@ def update_pw():
 
         if website_input.get() in all_platform:
             new_password = password_input.get()
+            encrypted_new_password = encrypt_password(new_password)
             pw_to_update = session.query(PasswordManager).filter_by(platform=website_input.get()).first()
             
             if pw_to_update:
-                pw_to_update.user_password = new_password
+                pw_to_update.user_password = encrypted_new_password
                 try:
                     session.commit()
                     messagebox.showinfo(title= "Success!", message= "Password updated Successfully!")
@@ -164,7 +200,8 @@ def find_password():
 
         if website_input.get() in all_platform:
             platform_to_find = session.query(PasswordManager).filter_by(platform=website_input.get()).first()
-            messagebox.showinfo(title= "Credentials", message= f"Your Credentials: \nEmail: {platform_to_find.email}\nPassword: {platform_to_find.user_password}")
+            decrypted_password = decrypt_password(platform_to_find.user_password)
+            messagebox.showinfo(title= "Credentials", message= f"Your Credentials: \nEmail: {platform_to_find.email}\nPassword: {decrypted_password}")
         else:
             messagebox.showinfo(title= "Error", message= f"No Credential found for {website_input.get()}!")
 
