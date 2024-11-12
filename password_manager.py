@@ -4,6 +4,7 @@ import tkinter.messagebox
 import pyperclip
 import random
 import json
+from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -79,7 +80,7 @@ def save_pw():
 
     website = website_input.get()
     username = username_input.get()
-    password = password_input.get()
+    password = generate_password_hash(password_input.get(), method= 'pbkdf2:sha256', salt_length= 8)
 
     result = session.execute(session.query(PasswordManager).order_by(PasswordManager.id))
     all_result = result.scalars().all()
