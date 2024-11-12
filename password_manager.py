@@ -4,7 +4,7 @@ import tkinter.messagebox
 import pyperclip
 import random
 import json
-from werkzeug.security import generate_password_hash, check_password_hash
+from cryptography.fernet import Fernet
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -74,13 +74,17 @@ Session = sessionmaker(bind=engine)
 session = Session()
 
 
+# ---------------------------- PASSWORD ENCRIPTION ------------------------------- #
+
+
+
 # ---------------------------- SAVE PASSWORD ------------------------------- #
 
 def save_pw():
 
     website = website_input.get()
     username = username_input.get()
-    password = generate_password_hash(password_input.get(), method= 'pbkdf2:sha256', salt_length= 8)
+    password = password_input.get()
 
     result = session.execute(session.query(PasswordManager).order_by(PasswordManager.id))
     all_result = result.scalars().all()
