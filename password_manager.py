@@ -58,8 +58,8 @@ def get_or_generate_key():
     return key
 
 # Use the generated key
-key = os.environ.get("ENCRYP_KEY")  # Replace with your actual key
-cipher_suite = Fernet(key.encode())
+key = get_or_generate_key()  # Replace with your actual key
+cipher_suite = Fernet(key.decode())
 
 def encrypt_password(password):
     encrypted_password = cipher_suite.encrypt(password.encode())
